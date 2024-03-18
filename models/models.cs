@@ -2,6 +2,7 @@
 
 namespace models
 {
+
     public class CustomerV2
     {
         public string id { get; set; }
@@ -13,6 +14,22 @@ namespace models
         public string creationDate { get; set; }
         public List<CustomerAddress> addresses { get; set; }
         public Password password { get; set; }
+    }
+
+    public class CustomerV4
+    {
+        public string id { get; set; }
+        public string type { get; set; }
+        public string customerId { get; set; }
+        public string title { get; set; }
+        public string firstName { get; set; }
+        public string lastName { get; set; }
+        public string emailAddress { get; set; }
+        public string phoneNumber { get; set; }
+        public string creationDate { get; set; }
+        public List<CustomerAddress> addresses { get; set; }
+        public Password password { get; set; }
+        public int salesOrderCount { get; set; }
     }
 
     public class CustomerAddress
@@ -41,8 +58,8 @@ namespace models
     public class ProductCategory
     {
         public string id { get; set; }
-        public string name { get; set; }
         public string type { get; set; }
+        public string name { get; set; }
     }
 
     public class Product
@@ -59,7 +76,7 @@ namespace models
 
     public class Tag
     {
-        public string id { get; set; }
+        public string id { get; set; }        
         public string name { get; set; }
     }
 
@@ -81,27 +98,4 @@ namespace models
         public int quantity { get; set; }
     }
 
-    public class CustomerV4
-    {
-        public string id { get; set; }
-        public string type { get; set; }
-        public string customerId { get; set; }
-        public string title { get; set; }
-        public string firstName { get; set; }
-        public string lastName { get; set; }
-        public string emailAddress { get; set; }
-        public string phoneNumber { get; set; }
-        public string creationDate { get; set; }
-        public List<CustomerAddress> addresses { get; set; }
-        public Password password { get; set; }
-        public int salesOrderCount { get; set; }
-    }
-
-    public class CategorySales
-    {
-        public string id { get; set; }
-        public string categoryId { get; set; }
-        public string categoryName { get; set; }
-        public int totalSales { get; set; }
-    }
 }

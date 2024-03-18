@@ -12,130 +12,422 @@ namespace modeling_demos
 {
     class Program
     {
-        //=================================================================
-        //Load secrets
-
-        private static IConfigurationBuilder builder = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile(@"appSettings.json", optional: false, reloadOnChange: true)
-            .AddUserSecrets<Secrets>();
-
-        private static IConfigurationRoot config = builder.Build();
-
-        private static readonly string uri = config["uri"];
-        private static readonly string key = config["key"];
-
-        private static readonly CosmosClient client = new CosmosClient(uri, key);
+        public static CosmosClient client;
 
         public static async Task Main(string[] args)
         {
-            bool exit = false;
-            while (exit == false)
+            //=================================================================
+            //Load secrets and configuration
+
+            IConfigurationBuilder builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile(@"appSettings.json", optional: false, reloadOnChange: true)
+                .AddUserSecrets<Secrets>();
+            IConfigurationRoot config = builder.Build();
+
+            string uri = config["uri"];
+            string key = config["key"];
+            string sections = config["sections"];
+            string title = config["title"];
+
+            if (title is null) title = "Partitioning and Modeling";
+            if (sections is null) sections = "core,deploy";
+            if (uri is null | key is null | uri == "" | key == "")
             {
                 Console.Clear();
-                Console.WriteLine($"Cosmos DB Modeling and Partitioning Demos");
-                Console.WriteLine($"-----------------------------------------");
-                Console.WriteLine($"[a]   Query for single customer");
-                Console.WriteLine($"[b]   Point read for single customer");
-                Console.WriteLine($"[c]   List all product categories");
-                Console.WriteLine($"[d]   Query products by category id");
-                Console.WriteLine($"[e]   Update product category name");
-                Console.WriteLine($"[f]   Query orders by customer id");
-                Console.WriteLine($"[g]   Query for customer and all orders");
-                Console.WriteLine($"[h]   Create new order and update order total");
-                Console.WriteLine($"[i]   Delete order and update order total");
-                Console.WriteLine($"[j]   Query top 10 customers");
-                Console.WriteLine($"-------------------------------------------");
-                Console.WriteLine($"[k]   Create databases and containers");
-                Console.WriteLine($"[l]   Upload data to containers");
-                Console.WriteLine($"[m]   Delete databases and containers");
-                Console.WriteLine($"-------------------------------------------");
-                Console.WriteLine($"[x]   Exit");
-
-                ConsoleKeyInfo result = Console.ReadKey(true);
-
-                if (result.KeyChar == 'a')
-                {
-                    Console.Clear();
-                    await QueryCustomer();
-                }
-                else if (result.KeyChar == 'b')
-                {
-                    Console.Clear();
-                    await GetCustomer();
-                }
-                else if (result.KeyChar == 'c')
-                {
-                    Console.Clear();
-                    await ListAllProductCategories();
-                }
-                else if (result.KeyChar == 'd')
-                {
-                    Console.Clear();
-                    await QueryProductsByCategoryId();
-                }
-                else if (result.KeyChar == 'e')
-                {
-                    Console.Clear();
-                    await QueryProductsForCategory();
-                    await UpdateProductCategory();
-                    await QueryProductsForCategory();
-                    await RevertProductCategory();
-                }
-                else if (result.KeyChar == 'f')
-                {
-                    Console.Clear();
-                    await QuerySalesOrdersByCustomerId();
-                }
-                else if (result.KeyChar == 'g')
-                {
-                    Console.Clear();
-                    await QueryCustomerAndSalesOrdersByCustomerId();
-                }
-                else if (result.KeyChar == 'h')
-                {
-                    Console.Clear();
-                    await CreateNewOrderAndUpdateCustomerOrderTotal();
-                }
-                else if (result.KeyChar == 'i')
-                {
-                    Console.Clear();
-                    await DeleteOrder();
-                }
-                else if (result.KeyChar == 'j')
-                {
-                    Console.Clear();
-                    await GetTop10Customers();
-                }
-                else if (result.KeyChar == 'k')
-                {
-                    // Create databases and containers
-                    await Deployment.CreateDatabase(client);
-                    Console.Clear();
-                    
-                }
-                else if (result.KeyChar == 'l')
-                {
-                    //Upload data to containers
-                    await Deployment.LoadDatabase(client);
-                    Console.Clear();
-                }
-                else if (result.KeyChar == 'm')
-                {
-                    //Delete databases and containers
-                    await Deployment.DeleteDatabase(client);
-                    Console.Clear();
-              
-                }
-                else if (result.KeyChar == 'x')
-                {
-                    exit = true;
-                }
+                Console.WriteLine("Account URI and Key must be set in appSettings");
+                Console.ReadKey();
+                return;
             }
+
+            //=================================================================
+            //Instantiate Cosmos DB client
+
+            CosmosClientOptions clientOptions = new CosmosClientOptions { ConnectionMode = ConnectionMode.Direct, AllowBulkExecution = true };
+            client = new CosmosClient(uri, key, clientOptions);
+
+            //=================================================================
+            //Run Menu
+
+            bool exit = false;
+            if (uri is not null & key is not null & sections is not null & title is not null)
+                while (exit == false)
+                {
+                    Console.Clear();
+                    Console.WriteLine($"Cosmos DB Modeling and Partitioning Demos");
+                    Console.WriteLine();
+                    Console.WriteLine($"Cosmos DB {title} Demos");
+                    if (sections.Contains("basic", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine($"------------------------------ basics -----------");
+                        Console.WriteLine($"[1]   Create a customer");
+                        Console.WriteLine($"[2]   Create a customer with response");
+                        Console.WriteLine($"[3]   Query customer by First Name ");
+                        Console.WriteLine($"[4]   Query customer by Last Name");
+                        Console.WriteLine($"[5]   Query customer by Id");
+                        Console.WriteLine($"[6]   Point Read customer by Id");
+                    }
+                    Console.WriteLine();
+                    if (sections.Contains("core", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        Console.WriteLine($"---------------------------- modeling -------------");
+                        Console.WriteLine($"[a]   Query for single customer");
+                        Console.WriteLine($"[b]   Point read for single customer");
+                        Console.WriteLine($"[c]   List all product categories");
+                        Console.WriteLine($"[d]   Query products by category id");
+                        Console.WriteLine($"[e]   Update product category name");
+                        Console.WriteLine($"[f]   Query orders by customer id");
+                        Console.WriteLine($"[g]   Query for customer and all orders");
+                        Console.WriteLine($"[h]   Create new order and update order total");
+                        Console.WriteLine($"[i]   Delete order and update order total");
+                        Console.WriteLine($"[j]   Query top 10 customers");
+                        Console.WriteLine();
+                    }
+                    if (sections.Contains("deploy", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        Console.WriteLine($"---------------------------- deploy ---------------");
+                        Console.WriteLine($"[k]   Create databases and containers");
+                        Console.WriteLine($"[l]   Upload data to containers");
+                        Console.WriteLine($"[m]   Delete databases and containers");
+                        Console.WriteLine();
+                    }
+                    Console.WriteLine($"-------------------------------------------");
+                    Console.WriteLine($"[x]   Exit");
+
+                    ConsoleKeyInfo result = Console.ReadKey(true);
+                    if (sections.Contains("basic", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        if (result.KeyChar == '1')
+                        {
+                            Console.Clear();
+                            await basicCreateCustomer1();
+                        }
+                        if (result.KeyChar == '2')
+                        {
+                            Console.Clear();
+                            await basicCreateCustomer2();
+                        }
+                        if (result.KeyChar == '3')
+                        {
+                            Console.Clear();
+                            await basicQueryCustomerFirstName();
+                        }
+                        if (result.KeyChar == '4')
+                        {
+                            Console.Clear();
+                            await basicQueryCustomerLastName();
+                        }
+                        if (result.KeyChar == '5')
+                        {
+                            Console.Clear();
+                            await basicQueryCustomerId();
+                        }
+                        if (result.KeyChar == '6')
+                        {
+                            Console.Clear();
+                            await basicGetCustomerId();
+                        }
+                    }
+
+                    if (result.KeyChar == 'a')
+                    {
+                        Console.Clear();
+                        await QueryCustomer();
+                    }
+                    else if (result.KeyChar == 'b')
+                    {
+                        Console.Clear();
+                        await GetCustomer();
+                    }
+                    else if (result.KeyChar == 'c')
+                    {
+                        Console.Clear();
+                        await ListAllProductCategories();
+                    }
+                    else if (result.KeyChar == 'd')
+                    {
+                        Console.Clear();
+                        await QueryProductsByCategoryId();
+                    }
+                    else if (result.KeyChar == 'e')
+                    {
+                        Console.Clear();
+                        await QueryProductsForCategory();
+                        await UpdateProductCategory();
+                        await QueryProductsForCategory();
+                        await RevertProductCategory();
+                    }
+                    else if (result.KeyChar == 'f')
+                    {
+                        Console.Clear();
+                        await QuerySalesOrdersByCustomerId();
+                    }
+                    else if (result.KeyChar == 'g')
+                    {
+                        Console.Clear();
+                        await QueryCustomerAndSalesOrdersByCustomerId();
+                    }
+                    else if (result.KeyChar == 'h')
+                    {
+                        Console.Clear();
+                        await CreateNewOrderAndUpdateCustomerOrderTotal();
+                    }
+                    else if (result.KeyChar == 'i')
+                    {
+                        Console.Clear();
+                        await DeleteOrder();
+                    }
+                    else if (result.KeyChar == 'j')
+                    {
+                        Console.Clear();
+                        await GetTop10Customers();
+                    }
+                    else if (result.KeyChar == 'k')
+                    {
+                        // Create databases and containers
+                        await Deployment.CreateDatabase(client);
+                        Console.Clear();
+
+                    }
+                    else if (result.KeyChar == 'l')
+                    {
+                        //Upload data to containers
+                        await Deployment.LoadDatabase(client);
+                        Console.Clear();
+                    }
+                    else if (result.KeyChar == 'm')
+                    {
+                        //Delete databases and containers
+                        await Deployment.DeleteDatabase(client);
+                        Console.Clear();
+
+                    }
+                    else if (result.KeyChar == 'x')
+                    {
+                        exit = true;
+                    }
+                }
 
         }
 
-        public static async Task QueryCustomer() 
+        public static async Task basicCreateCustomer1()
+        {
+            Database database = client.GetDatabase("basics");
+            Container container = database.GetContainer("customers");
+
+            string customerString =
+                   @"{
+                        ""id"": ""0012D555-C7DE-4C4B-B4A4-2E8A6B8E1161"",
+                        ""title"": ""Mr"",
+                        ""firstName"": ""Franklin"",
+                        ""lastName"": ""Ye"",
+                        ""emailAddress"": ""franklin9@adventure-works.com""
+                     }
+            ";
+
+            JObject customer = JObject.Parse(customerString);
+
+            await container.CreateItemAsync(customer);
+
+            Console.WriteLine("Created customer Franklin Ye");
+
+            Console.WriteLine("Customer Created.\n Press any key to continue...");
+            Console.ReadKey();
+        }
+
+        public static async Task basicCreateCustomer2()
+        {
+            Database database = client.GetDatabase("basics");
+            Container container = database.GetContainer("customers");
+
+            string customerString =
+                   @"{
+                        ""id"": ""0012D555-C7DE-4C4B-B4A4-2E8A6B8E1123"",
+                        ""title"": ""Mrs"",
+                        ""firstName"": ""Jane"",
+                        ""lastName"": ""Ye"",
+                        ""emailAddress"": ""janeye@adventure-works.com""
+                     }
+            ";
+
+            JObject customer = JObject.Parse(customerString);
+
+            Console.WriteLine("Created customer Jane Ye");
+
+            ItemResponse<JObject> response = await container.CreateItemAsync(customer);
+
+            Console.WriteLine($"Document: \n{response.Resource.ToString()}");
+            Console.WriteLine($"Request Charge : {response.RequestCharge.ToString()}");
+
+            Console.WriteLine("Customer Created.\n Press any key to continue...");
+            Console.ReadKey();
+        }
+
+
+        public static async Task basicReplaceCustomer()
+        {
+            Database database = client.GetDatabase("basics");
+            Container container = database.GetContainer("customers");
+
+            string customerString =
+                   @"{
+                        ""id"": ""0012D555-C7DE-4C4B-B4A4-2E8A6B8E1161"",
+                        ""title"": ""Mr"",
+                        ""firstName"": ""Franklin"",
+                        ""lastName"": ""Ye"",
+                        ""someAdditionProperty"": ""Something new"",
+                        ""emailAddress"": ""franklin9@adventure-works.com""
+                     }
+            ";
+
+            JObject customer = JObject.Parse(customerString);
+
+            Console.WriteLine("Update customer Franklin");
+
+            await container.ReplaceItemAsync(customer, "0012D555-C7DE-4C4B-B4A4-2E8A6B8E1161");
+
+            Console.WriteLine("Customer Updated. \nPress any key to continue...");
+            Console.ReadKey();
+        }
+
+        public static async Task basicQueryCustomerLastName()
+        {
+            Database database = client.GetDatabase("basics");
+            Container container = database.GetContainer("customers");
+
+            string customerName = "Ye";
+            //Get a customer with a query
+            string sql = $"SELECT * FROM c WHERE c.lastName = @name";
+
+            Console.WriteLine("Query customers \n");
+            Console.WriteLine(sql);
+            Console.WriteLine($"@name = {customerName}");
+            Console.WriteLine();
+
+            FeedIterator<JObject> resultSet = container.GetItemQueryIterator<JObject>(
+                new QueryDefinition(sql)
+                .WithParameter("@name", customerName)
+              );
+
+            double RequestCharge = 0;
+            double Iterations = 0;
+
+            while (resultSet.HasMoreResults)
+            {
+                FeedResponse<JObject> response = await resultSet.ReadNextAsync();
+
+                foreach (JObject customer in response)
+                {
+                    Console.WriteLine($"Customer: \n {customer.ToString()} \n");
+                }
+
+                RequestCharge = RequestCharge + response.RequestCharge;
+                Iterations++;
+            }
+            Console.WriteLine($"Customer Query Request Charge      : {RequestCharge}");
+            Console.WriteLine($"Customer Query Response Iterations : {Iterations}\n");
+            Console.WriteLine("Press any key to continue...");
+
+            Console.ReadKey();
+        }
+
+        public static async Task basicQueryCustomerFirstName()
+        {
+            Database database = client.GetDatabase("basics");
+            Container container = database.GetContainer("customers");
+
+            string customerName = "Jane";
+            //Get a customer with a query
+            string sql = $"SELECT * FROM c WHERE c.firstName = @name";
+
+            FeedIterator<JObject> resultSet = container.GetItemQueryIterator<JObject>(
+                new QueryDefinition(sql)
+                .WithParameter("@name", customerName)
+              );
+
+            double RequestCharge = 0;
+            double Iterations = 0;
+
+            Console.WriteLine("Query customers \n");
+            while (resultSet.HasMoreResults)
+            {
+                FeedResponse<JObject> response = await resultSet.ReadNextAsync();
+
+                foreach (JObject customer in response)
+                {
+                    Console.WriteLine($"Customer: \n {customer.ToString()} \n");
+                }
+
+                RequestCharge = RequestCharge + response.RequestCharge;
+                Iterations++;
+            }
+            Console.WriteLine($"Customer Query Request Charge      : {RequestCharge}");
+            Console.WriteLine($"Customer Query Response Iterations : {Iterations}\n");
+            Console.WriteLine("Press any key to continue...");
+
+            Console.ReadKey();
+        }
+
+        public static async Task basicQueryCustomerId()
+        {
+            Database database = client.GetDatabase("basics");
+            Container container = database.GetContainer("customers");
+
+            string customerId = "0012D555-C7DE-4C4B-B4A4-2E8A6B8E1123";
+            //Get a customer with a query
+            string sql = $"SELECT * FROM c WHERE c.id = @id";
+
+            FeedIterator<JObject> resultSet = container.GetItemQueryIterator<JObject>(
+                new QueryDefinition(sql)
+                .WithParameter("@id", customerId)
+              );
+
+            double RequestCharge = 0;
+            double Iterations = 0;
+            Console.WriteLine("Query customers \n");
+            while (resultSet.HasMoreResults)
+            {
+                FeedResponse<JObject> response = await resultSet.ReadNextAsync();
+
+                foreach (JObject customer in response)
+                {
+                    Console.WriteLine($"Customer: \n {customer.ToString()} \n");
+                }
+
+                RequestCharge = RequestCharge + response.RequestCharge;
+                Iterations++;
+            }
+            Console.WriteLine($"Customer Query Request Charge      : {RequestCharge}");
+            Console.WriteLine($"Customer Query Response Iterations : {Iterations}\n");
+            Console.WriteLine("Press any key to continue...");
+
+            Console.ReadKey();
+        }
+
+        public static async Task basicGetCustomerId()
+        {
+            Database database = client.GetDatabase("basics");
+            Container container = database.GetContainer("customers");
+
+            string customerId = "0012D555-C7DE-4C4B-B4A4-2E8A6B8E1123";
+
+            Console.WriteLine("Point Read for a single customer\n");
+
+            //Get a customer with a point read
+            ItemResponse<JObject> response = await container.ReadItemAsync<JObject>(
+                id: customerId,
+                partitionKey: new PartitionKey(customerId));
+
+            Console.WriteLine($"Customer: \n {response.Resource.ToString()} \n");
+
+            Console.WriteLine($"Point Read Request Charge {response.RequestCharge}\n");
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
+        }
+
+
+        public static async Task QueryCustomer()
         {
             Database database = client.GetDatabase("database-v2");
             Container container = database.GetContainer("customer");
@@ -179,8 +471,8 @@ namespace modeling_demos
             Console.WriteLine("Point Read for a single customer\n");
 
             //Get a customer with a point read
-            ItemResponse<CustomerV2> response =  await container.ReadItemAsync<CustomerV2>(
-                id: customerId, 
+            ItemResponse<CustomerV2> response = await container.ReadItemAsync<CustomerV2>(
+                id: customerId,
                 partitionKey: new PartitionKey(customerId));
 
             Print(response.Resource);
@@ -210,7 +502,7 @@ namespace modeling_demos
                 FeedResponse<ProductCategory> response = await resultSet.ReadNextAsync();
 
                 Console.WriteLine("Print out product categories\n");
-                foreach(ProductCategory productCategory in response)
+                foreach (ProductCategory productCategory in response)
                 {
                     Print(productCategory);
                 }
@@ -261,16 +553,18 @@ namespace modeling_demos
 
             //Category Name = Accessories, Tires and Tubes
             string categoryId = "86F3CBAB-97A7-4D01-BABB-ADEFFFAED6B4";
-            
+
             //Query for this category. How many products?
             string sql = "SELECT COUNT(1) AS ProductCount, c.categoryName " +
                 "FROM c WHERE c.categoryId = '86F3CBAB-97A7-4D01-BABB-ADEFFFAED6B4' " +
                 "GROUP BY c.categoryName";
 
             FeedIterator<dynamic> resultSet = container.GetItemQueryIterator<dynamic>(
-                new QueryDefinition(sql), 
-                requestOptions: new QueryRequestOptions{ 
-                    PartitionKey = new PartitionKey(categoryId)});
+                new QueryDefinition(sql),
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey(categoryId)
+                });
 
             Console.WriteLine("Print out category name and number of products in that category\n");
             while (resultSet.HasMoreResults)
@@ -339,15 +633,15 @@ namespace modeling_demos
             Container container = database.GetContainer("customer");
 
             string customerId = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447";
-            
+
             string sql = "SELECT * from c WHERE c.type = 'salesOrder' and c.customerId = @customerId";
 
             FeedIterator<SalesOrder> resultSet = container.GetItemQueryIterator<SalesOrder>(
                 new QueryDefinition(sql)
                 .WithParameter("@customerId", customerId),
-                requestOptions: new QueryRequestOptions 
-                { 
-                    PartitionKey = new PartitionKey(customerId) 
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey(customerId)
                 });
 
             Console.WriteLine("Print out orders for this customer\n");
@@ -376,9 +670,9 @@ namespace modeling_demos
             FeedIterator<dynamic> resultSet = container.GetItemQueryIterator<dynamic>(
                 new QueryDefinition(sql)
                 .WithParameter("@customerId", customerId),
-                requestOptions: new QueryRequestOptions 
-                { 
-                    PartitionKey = new PartitionKey(customerId) 
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey(customerId)
                 });
 
             CustomerV4 customer = new CustomerV4();
@@ -393,7 +687,7 @@ namespace modeling_demos
                     if (item.type == "customer")
                     {
                         customer = JsonConvert.DeserializeObject<CustomerV4>(item.ToString());
-                        
+
                     }
                     else if (item.type == "salesOrder")
                     {
@@ -404,7 +698,7 @@ namespace modeling_demos
 
             Console.WriteLine("Print out customer record and all their orders\n");
             Print(customer);
-            foreach(SalesOrder order in orders)
+            foreach (SalesOrder order in orders)
             {
                 Print(order);
             }
@@ -421,7 +715,7 @@ namespace modeling_demos
             //Get the customer
             string customerId = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447";
             ItemResponse<CustomerV4> response = await container.ReadItemAsync<CustomerV4>(
-                id: customerId, 
+                id: customerId,
                 partitionKey: new PartitionKey(customerId)
                 );
             CustomerV4 customer = response.Resource;
@@ -481,7 +775,7 @@ namespace modeling_demos
             string orderId = "5350ce31-ea50-4df9-9a48-faff97675ac5";
 
             ItemResponse<CustomerV4> response = await container.ReadItemAsync<CustomerV4>(
-                id: customerId, 
+                id: customerId,
                 partitionKey: new PartitionKey(customerId)
             );
             CustomerV4 customer = response.Resource;
@@ -541,7 +835,7 @@ namespace modeling_demos
 
     class Secrets
     {
-        public string uri="";
-        public string key="";
+        public string uri = "";
+        public string key = "";
     }
 }
